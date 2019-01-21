@@ -10,11 +10,14 @@ type ValidationErrors struct {
 	V_errors validator.ValidationErrors
 }
 
-func (err *ValidationErrors) ToHumanReadable() (errors []HumanReadableError){
+func (err *ValidationErrors) ToHumanReadable(param string) (errors []HumanReadableStatus){
 	for _, err := range err.V_errors {
-		errors = append(errors, HumanReadableError{
-			Key: strings.ToLower(err.Field()),
-			Reason: GenerateReason(err.Tag(), strings.ToLower(err.Field()), err.Param()),
+		errors = append(errors, HumanReadableStatus{
+			Type: fmt.Sprintf("%s-is-invalid", strings.ToLower(err.Field())),
+			Message: GenerateReason(err.Tag(), strings.ToLower(err.Field()), err.Param()),
+			Param: strings.ToLower(err.Field()),
+			Value: err.Value(),
+			Source: param,
 		})
 		}
 	return
