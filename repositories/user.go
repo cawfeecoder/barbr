@@ -22,7 +22,6 @@ type UserRepository struct {
 	logger *zap.Logger
 }
 
-
 func InitalizeUserRepository() (repository UserRepository){
 	logger, _ := zap.NewProduction()
 	return UserRepository{
@@ -41,16 +40,16 @@ func (r *UserRepository) EnsureIndex() {
 		Unique: &unique,
 	}
 	opts := options.CreateIndexes().SetMaxTime(10 * time.Second)
-	r.GetUserCollection().Indexes().CreateOne(context.Background(), index, opts)
+	r.GetCollection().Indexes().CreateOne(context.Background(), index, opts)
 	r.logger.Info("Successfully created index", zap.String("index", "email-uniq"))
 }
 
-func (r *UserRepository) GetUserCollection() *mongo.Collection{
+func (r *UserRepository) GetCollection() *mongo.Collection{
 	return db.GetClient().Database(r.database).Collection(r.collectionName)
 }
 
 func (r *UserRepository) Authenticate(email string, password []byte) (result bool, err error) {
-	c := r.GetUserCollection()
+	c := r.GetCollection()
 	var user models.User
 	err = c.FindOne(context.Background(), bson.M{"email": email}).Decode(&user)
 	if err != nil {
@@ -65,67 +64,76 @@ func (r *UserRepository) Authenticate(email string, password []byte) (result boo
 	}
 }
 
-func (r *UserRepository) Create(user *models.User) (result *models.UserDTO, err error) {
-	c := r.GetUserCollection()
-	user.Status = "active"
-	user.HashPassword()
+func (r *UserRepository) Execute(arg []interface{}, param string, q QueryHandler) (result interface{}, errs []models.HumanReadableStatus) {
+	c := r.GetCollection()
+	result, err := q(arg, c)
+	if err != nil {
+		r.logger.Error("failed to execute query", zap.Error(err))
+		return nil, models.GetErrorFromMongo(err, param)
+	}
+	return
+}
+
+func (r *UserRepository) Create(arg []interface{}, c *mongo.Collection) (result interface{}, err error) {
+	user := arg[0].(models.User)
+	user.New()
 	res, err := c.InsertOne(context.Background(), user)
 	if err != nil {
-		r.logger.Error("cannot insert new user", zap.Error(err))
-		return nil, err
+		r.logger.Error("failed to insert data", zap.Error(err))
+		return
 	}
-	result = user.ConvertToDTO()
-	result.ID = res.InsertedID.(primitive.ObjectID)
-	return result, nil
+	result = user.ConvertToDTO(res.InsertedID)
+	return
 }
 
-func (r *UserRepository) Get(id string) (result *models.UserDTO, err error){
-	c := r.GetUserCollection()
-	object_id, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
+func (r *UserRepository) Get(arg []interface{}, c *mongo.Collection) (result interface{}, err error){
+	var user models.UserDTO
+	var object_id primitive.ObjectID
+	if object_id, err = primitive.ObjectIDFromHex(arg[0].(string)); err != nil {
 		r.logger.Error("cannot convert to object id", zap.Error(err))
-		return nil, err
+		return
 	}
-	user := models.UserDTO{}
-	err = c.FindOne(context.Background(), bson.D{{"_id",object_id}}).Decode(&user)
-	if err != nil {
+	if err = c.FindOne(context.Background(), bson.D{{"_id",object_id}}).Decode(&user); err != nil {
 		r.logger.Error("failed to decode data", zap.Error(err))
-		return nil, err
+		return
 	}
-	return &user, nil
+	result = user
+	return
 }
 
-func (r *UserRepository) Update(id string, update models.UserDTO) (result *models.UserDTO, err error){
-	c := r.GetUserCollection()
-	object_id, err := primitive.ObjectIDFromHex(id)
+func (r *UserRepository) Update(arg []interface{}, c *mongo.Collection) (result interface{}, err error){
+	var user models.UserDTO
+	object_id, err := primitive.ObjectIDFromHex(arg[0].(string))
 	if err != nil {
 		r.logger.Error("cannot convert to object id", zap.Error(err))
-		return nil, err
+		return
 	}
-	return_opts := options.FindOneAndUpdateOptions{}
-	return_opts.SetReturnDocument(options.After)
-	err = c.FindOneAndUpdate(context.Background(), bson.D{{"_id", object_id}}, bson.D{{"$set", update}}, &return_opts).Decode(&result)
+	opts := options.FindOneAndUpdateOptions{}
+	opts.SetReturnDocument(options.After)
+	err = c.FindOneAndUpdate(context.Background(), bson.D{{"_id", object_id}}, bson.D{{"$set", arg[1].(models.UserDTO)}}, &opts).Decode(&user)
 	if err != nil {
 		r.logger.Error("failed to decode data", zap.Error(err))
-		return nil, err
+		return
 	}
-	return result, nil
+	result = user
+	return
 }
 
-func (r *UserRepository) Delete(id string) (result *models.UserDTO, err error){
-	c := r.GetUserCollection()
-	object_id, err := primitive.ObjectIDFromHex(id)
+func (r *UserRepository) Delete(arg []interface{}, c *mongo.Collection) (result interface{}, err error){
+	var user models.UserDTO
+	object_id, err := primitive.ObjectIDFromHex(arg[0].(string))
 	if err != nil {
 		r.logger.Error("cannot convert to object id", zap.Error(err))
-		return nil, err
+		return
 	}
-	return_opts := options.FindOneAndUpdateOptions{}
-	return_opts.SetReturnDocument(options.After)
-	err = c.FindOneAndUpdate(context.Background(), bson.D{{"_id", object_id}}, bson.D{{"$set", bson.M{"status": "purge"}}}).Decode(&result)
+	opts := options.FindOneAndUpdateOptions{}
+	opts.SetReturnDocument(options.After)
+	err = c.FindOneAndUpdate(context.Background(), bson.D{{"_id", object_id}}, bson.D{{"$set", bson.M{"status": "purge"}}}).Decode(&user)
 	if err != nil {
 		r.logger.Error("failed to decode data", zap.Error(err))
-		return nil, err
+		return
 	}
-	return result, nil
+	result = user
+	return
 }
 

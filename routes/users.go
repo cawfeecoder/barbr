@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ghostbox/user-service/controllers"
 	"ghostbox/user-service/models"
 	"ghostbox/user-service/repositories"
 	"github.com/buaazp/fasthttprouter"
@@ -83,162 +84,79 @@ func Login(ctx *fasthttp.RequestCtx) {
 }
 
 func CreateUser(ctx *fasthttp.RequestCtx) {
-	var user *models.User
-	err := json.Unmarshal(ctx.Request.Body(), &user)
-	if err != nil {
-		logger.Error("failed to marshal body", zap.Error(err))
-		ctx.SetStatusCode(500)
-		ctx.SetBody([]byte("Internal Server Error"))
-		return
-	}
+	var user models.User
 	resp := models.Response{}
-	err = validate.Struct(user)
+	err := controllers.HandleUnmarshal(ctx, &user)
 	if err != nil {
-		validation_err := models.ValidationErrors{err.(validator.ValidationErrors)}
-		resp.Errors = append(resp.Errors, validation_err.ToHumanReadable(""))
-		if err != nil {
-			logger.Error("could not marshal to json", zap.Error(err))
-			ctx.Error(fmt.Sprintf("Error: %v", err.Error()), 500)
-		}
-		resp_json, err := resp.ToJSON()
-		if err != nil {
-			logger.Error("could not marshal to json", zap.Error(err))
-			ctx.Error(fmt.Sprintf("Error: %v", err.Error()), 500)
-		}
-		ctx.SetStatusCode(400)
-		ctx.SetBody(resp_json)
 		return
 	}
-	res, err := user_repo.Create(user)
-	if err != nil {
-		resp.Errors = append(resp.Errors, models.GetErrorFromMongo(err, ""))
-		resp_json, err := resp.ToJSON()
-		if err != nil {
-			logger.Error("could not marshal to json", zap.Error(err))
-			ctx.Error(fmt.Sprintf("Error: %v", err.Error()), 500)
-		}
-		ctx.SetStatusCode(400)
-		ctx.SetBody(resp_json)
+	validation_errs := user.Validate("")
+	if len(validation_errs) > 0 {
+		controllers.HandleErrors(ctx, validation_errs)
+		return
+	}
+	res, query_err := user_repo.Execute([]interface{}{user}, "", user_repo.Create)
+	if len(query_err) > 0 {
+		controllers.HandleErrors(ctx, query_err)
 		return
 	}
 	resp.Data = []interface{}{res}
-	resp_json, err := json.Marshal(resp)
-	if err != nil {
-		logger.Error("could not marshal to json", zap.Error(err))
-		ctx.Error(fmt.Sprintf("Error: %v", err.Error()), 500)
+	if data := controllers.HandleMarshal(ctx, resp); data != nil {
+		ctx.Success("Success", data)
 	}
-	ctx.Success("Success", resp_json)
+	return
 }
 
 func GetUser(ctx *fasthttp.RequestCtx) {
-	res, err := user_repo.Get(ctx.UserValue("id").(string))
 	resp := models.Response{}
-	if err != nil {
-		logger.Error("failed to fetch user", zap.Error(err))
-		resp.Errors = append(resp.Errors, models.GetErrorFromMongo(err, ctx.UserValue("id").(string)))
-		resp_json, err := json.Marshal(resp)
-		if err != nil {
-			logger.Error("failed to marshal to []byte", zap.Error(err))
-			ctx.SetStatusCode(500)
-			ctx.SetBody([]byte("Internal Server Error"))
-			return
-		}
-		ctx.SetStatusCode(404)
-		ctx.SetBody([]byte(resp_json))
+	res, query_err := user_repo.Execute([]interface{}{ctx.UserValue("id")}, ctx.UserValue("id").(string), user_repo.Get)
+	if len(query_err) > 0 {
+		controllers.HandleErrors(ctx, query_err)
 		return
 	}
 	resp.Data = []interface{}{res}
-	resp_json, err := json.Marshal(resp)
-	if err != nil {
-		logger.Error("failed to marshal to []byte", zap.Error(err))
-		ctx.SetStatusCode(500)
-		ctx.SetBody([]byte("Internal Server Error"))
-		return
+	if data := controllers.HandleMarshal(ctx, resp); data != nil {
+		ctx.Success("Success", data)
 	}
-	ctx.Success("application/json", resp_json)
 	return
 }
 
 func UpdateUser(ctx *fasthttp.RequestCtx) {
 	var user models.UserDTO
-	err := json.Unmarshal(ctx.Request.Body(), &user)
-	if err != nil {
-		logger.Error("failed to marshal body", zap.Error(err))
-		ctx.SetStatusCode(500)
-		ctx.SetBody([]byte("Internal Server Error"))
-		return
-	}
 	resp := models.Response{}
-	err = validate.Struct(user)
+	err := controllers.HandleUnmarshal(ctx, &user)
 	if err != nil {
-		logger.Error("cannot validate user update", zap.Error(err))
-		validation_err := models.ValidationErrors{err.(validator.ValidationErrors)}
-		resp.Errors = append(resp.Errors, validation_err.ToHumanReadable(ctx.UserValue("id").(string)))
-		if err != nil {
-			logger.Error("could not marshal to json", zap.Error(err))
-			ctx.Error(fmt.Sprintf("Error: %v", err.Error()), 500)
-		}
-		resp_json, err := resp.ToJSON()
-		if err != nil {
-			logger.Error("could not marshal to json", zap.Error(err))
-			ctx.Error(fmt.Sprintf("Error: %v", err.Error()), 500)
-		}
-		ctx.SetStatusCode(400)
-		ctx.SetBody(resp_json)
 		return
 	}
-	res, err := user_repo.Update(ctx.UserValue("id").(string), user)
-	if err != nil {
-		logger.Error("failed to update user", zap.Error(err))
-		resp.Errors = []interface{}{models.GetErrorFromMongo(err, "id")}
-		resp_json, err := json.Marshal(resp)
-		if err != nil {
-			logger.Error("failed to marshal []byte", zap.Error(err))
-			ctx.SetStatusCode(500)
-			ctx.SetBody([]byte("Internal Server Error"))
-			return
-		}
-		ctx.SetStatusCode(400)
-		ctx.SetBody([]byte(resp_json))
+	validation_errs := user.Validate("")
+	if len(validation_errs) > 0 {
+		controllers.HandleErrors(ctx, validation_errs)
+		return
+	}
+	res, query_err := user_repo.Execute([]interface{}{ctx.UserValue("id"), user}, ctx.UserValue("id").(string), user_repo.Update)
+	if len(query_err) > 0 {
+		fmt.Printf("Query Errors: %v", query_err)
+		controllers.HandleErrors(ctx, query_err)
 		return
 	}
 	resp.Data = []interface{}{res}
-	resp_json, err := json.Marshal(resp)
-	if err != nil {
-		logger.Error("failed to marshal to []byte", zap.Error(err))
-		ctx.SetStatusCode(500)
-		ctx.SetBody([]byte("Internal Server Error"))
-		return
+	if data := controllers.HandleMarshal(ctx, resp); data != nil {
+		ctx.Success("Success", data)
 	}
-	ctx.Success("application/json", resp_json)
 	return
 }
 
 func DeleteUser(ctx *fasthttp.RequestCtx) {
 	resp := models.Response{}
-	_, err := user_repo.Delete(ctx.UserValue("id").(string))
-	if err != nil {
-		logger.Error("failed to update user", zap.Error(err))
-		resp.Errors = []interface{}{models.GetErrorFromMongo(err, "id")}
-		resp_json, err := json.Marshal(resp)
-		if err != nil {
-			logger.Error("failed to marshal []byte", zap.Error(err))
-			ctx.SetStatusCode(500)
-			ctx.SetBody([]byte("Internal Server Error"))
-			return
-		}
-		ctx.SetStatusCode(400)
-		ctx.SetBody([]byte(resp_json))
+	_, query_err := user_repo.Execute([]interface{}{ctx.UserValue("id").(string)}, "id", user_repo.Delete)
+	if len(query_err) > 0 {
+		fmt.Printf("Query Errors: %v", query_err)
+		controllers.HandleErrors(ctx, query_err)
 		return
 	}
 	resp.Data = []interface{}{models.HumanReadableStatus{Type: "account-delete-success", Message: "Your account has successfully been marked for deletion and will be purged within 72 hours.", Source: ctx.UserValue("id").(string)}}
-	resp_json, err := json.Marshal(resp)
-	if err != nil {
-		logger.Error("failed to marshal to []byte", zap.Error(err))
-		ctx.SetStatusCode(500)
-		ctx.SetBody([]byte("Internal Server Error"))
-		return
+	if data := controllers.HandleMarshal(ctx, resp); data != nil {
+		ctx.Success("Success", data)
 	}
-	ctx.Success("application/json", resp_json)
 	return
 }

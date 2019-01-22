@@ -7,11 +7,11 @@ import (
 )
 
 type ValidationErrors struct {
-	V_errors validator.ValidationErrors
+	Err validator.ValidationErrors
 }
 
 func (err *ValidationErrors) ToHumanReadable(param string) (errors []HumanReadableStatus){
-	for _, err := range err.V_errors {
+	for _, err := range err.Err {
 		errors = append(errors, HumanReadableStatus{
 			Type: fmt.Sprintf("%s-is-invalid", strings.ToLower(err.Field())),
 			Message: GenerateReason(err.Tag(), strings.ToLower(err.Field()), err.Param()),
