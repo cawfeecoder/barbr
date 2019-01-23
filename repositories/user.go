@@ -70,8 +70,11 @@ func (r *UserRepository) Authenticate(arg[]interface{}, c *mongo.Collection) (re
 		r.logger.Error("failed to decode data", zap.Error(err))
 		return false, err
 	}
-	ok, err := argon2.VerifyEncoded(arg[1].([]byte), []byte(user.Password))
-	return ok, err
+	ok, _ := argon2.VerifyEncoded(arg[1].([]byte), []byte(user.Password))
+	if ok {
+		return ok, nil
+	}
+	return ok, errors.New("incorrect password provided")
 }
 
 func (r *UserRepository) Create(arg []interface{}, c *mongo.Collection) (result interface{}, err error) {

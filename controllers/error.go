@@ -5,18 +5,7 @@ import (
 	"ghostbox/user-service/models"
 	"github.com/valyala/fasthttp"
 	"go.uber.org/zap"
-	"log"
 )
-
-var logger *zap.Logger
-
-func init() {
-	var err error
-	logger, err = zap.NewProduction()
-	if err != nil {
-		log.Printf("ERROR: %v", err)
-	}
-}
 
 func InternalServerError(ctx *fasthttp.RequestCtx){
 	ctx.SetStatusCode(500)

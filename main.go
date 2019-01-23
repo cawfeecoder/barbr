@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ghostbox/user-service/controllers"
 	"ghostbox/user-service/repositories"
 	"ghostbox/user-service/routes"
 	"github.com/buaazp/fasthttprouter"
@@ -20,6 +21,8 @@ func main() {
 	user_repository.EnsureIndex()
 	logger.Info("initializing fasthttp router")
 	router := fasthttprouter.New()
+	logger.Info("initializing controllers")
+	controllers.InitializeControllers(user_repository)
 	logger.Info("initializing routers", zap.String("routes", "user"))
 	routes.InitalizeUserRoutes(router, user_repository)
 	logger.Info("starting server", zap.String("port", "12345"))

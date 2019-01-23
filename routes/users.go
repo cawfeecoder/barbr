@@ -18,66 +18,11 @@ func InitalizeUserRoutes(router *fasthttprouter.Router, user_repository reposito
 	user_repo = user_repository
 	logger, _ = zap.NewProduction()
 	validate = validator.New()
-	router.POST("/login", Login)
+	router.POST("/login", controllers.Authenticate)
 	router.POST("/user", CreateUser)
-	router.GET("/user", GetAllUsers)
 	router.GET("/user/:id", GetUser)
 	router.PUT("/user/:id", UpdateUser)
 	router.DELETE("/user/:id", DeleteUser)
-}
-
-/**
- * Authenticates a user by checking the hashed password against the one stored on the database record. Will return an error
- * if no user with the email exists or if there are no active user records with the email. The credentials must be provided
- * via the Authorization header to maintain best practice
- * @param ctx - HTTP Context
- * @return Unauthorized if process fails, potentially with an error. Otherwise returns true with a relevant status
- **/
-func Login(ctx *fasthttp.RequestCtx) {
-	//auth := ctx.Request.Header.Peek("Authorization")
-	//var email []byte
-	//resp := models.Response{}
-	//if bytes.HasPrefix(auth, []byte("Basic ")) {
-	//	payload, err := base64.StdEncoding.DecodeString(string(auth[len([]byte("Basic ")):]))
-	//	if err == nil {
-	//		pair := bytes.SplitN(payload, []byte(":"), 2)
-	//		if len(pair) == 2 {
-	//			email = pair[0]
-	//			password := pair[1]
-	//			res, err := user_repo.Authenticate(string(email), password)
-	//			if err != nil || !res {
-	//				logger.Error("failed to authenticate", zap.Error(err))
-	//				ctx.SetStatusCode(401)
-	//				resp.Errors = []interface{}{models.HumanReadableStatus{Type:"user-incorrect-password", Message:"Incorrect password was provided", Param:"password"}}
-	//				bytes, err := json.Marshal(resp)
-	//				if err != nil {
-	//					logger.Error("failed to marshal body", zap.Error(err))
-	//					ctx.SetStatusCode(500)
-	//					ctx.SetBody([]byte("Internal Server Error"))
-	//					return
-	//				}
-	//				ctx.SetBody(bytes)
-	//				return
-	//			}
-	//			ctx.SetStatusCode(200)
-	//			resp.Data = []interface{}{models.HumanReadableStatus{Type:"user-auth-success", Message: fmt.Sprintf("User %s has successfully authenticated", string(email))}}
-	//			bytes, err := json.Marshal(resp)
-	//			if err != nil {
-	//				logger.Error("failed to marshal body", zap.Error(err))
-	//				ctx.SetStatusCode(500)
-	//				ctx.SetBody([]byte("Internal Server Error"))
-	//				return
-	//			}
-	//			ctx.SetBody(bytes)
-	//			return
-	//		}
-	//	} else {
-	//		logger.Error("failed to get authorization", zap.Error(err))
-	//	}
-	//} else {
-	//	logger.Error("missing authorization header", zap.Error(errors.New("Basic is not present in authorization header")))
-	//}
-	return
 }
 
 func CreateUser(ctx *fasthttp.RequestCtx) {

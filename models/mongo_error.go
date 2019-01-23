@@ -16,6 +16,8 @@ var extract_dup_values = regexp.MustCompile(`collection: \D+[.](?P<Collection>\D
 
 func GetErrorFromMongo(err error, param string) []HumanReadableStatus {
 	switch {
+	case err.Error() == "incorrect password provided":
+		return []HumanReadableStatus{HumanReadableStatus{Type: "user-incorrect-password", Message: "Incorrect password provided", Param: param}}
 	case err.Error() == "mongo: no documents in result":
 		return []HumanReadableStatus{HumanReadableStatus{Type: "id-not-found", Message: "ID does not reference any documents", Param: "id", Value: param, Source: param}}
 	case err.Error() == "the provided hex string is not a valid ObjectID" || err.Error() == "encoding/hex: odd length hex string":
