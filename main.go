@@ -23,8 +23,8 @@ func main() {
 	router := fasthttprouter.New()
 	logger.Info("initializing controllers")
 	controllers.InitializeControllers(user_repository)
-	logger.Info("initializing routers", zap.String("routes", "user"))
-	routes.InitalizeUserRoutes(router, user_repository)
+	logger.Info("initializing routers")
+	routes.InitializeRoutes(router)
 	logger.Info("starting server", zap.String("port", "12345"))
 	logger.Fatal("error starting server", zap.Error(fasthttp.ListenAndServe(":12345", router.Handler)))
 }
