@@ -34,6 +34,7 @@ func ExtractAuthenticationHeader(ctx *fasthttp.RequestCtx) (email string, passwo
 }
 
 func Authenticate(ctx *fasthttp.RequestCtx) {
+	projection := make(map[string]int)
 	resp := models.Response{}
 	email, password, err := ExtractAuthenticationHeader(ctx)
 	if err != nil {
@@ -42,7 +43,7 @@ func Authenticate(ctx *fasthttp.RequestCtx) {
 		HandleErrors(ctx, resp, err)
 		return
 	}
-	res, err := user_repo.Execute([]interface{}{email, password}, "password", user_repo.Authenticate)
+	res, err := user_repo.Execute([]interface{}{email, password}, "password", projection, user_repo.Authenticate)
 	if err != nil || !res.(bool) {
 		logger.Error("failed to authenticate", zap.Errors("errors", models.ToErrorsArray(err)))
 		HandleErrors(ctx, resp, err)

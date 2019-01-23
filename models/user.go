@@ -32,7 +32,7 @@ func (u *User) HashPassword() {
 func (u *User) ConvertToDTO(id interface{}) *UserDTO{
 	if id != nil {
 		return &UserDTO {
-			ID: id.(primitive.ObjectID),
+			ID: id.(*primitive.ObjectID),
 			Status: u.Status,
 			FName: u.FName,
 			LName: u.LName,
@@ -58,7 +58,7 @@ func (u *User) Validate(validate *validator.Validate,param string) (err []HumanR
 }
 
 type UserDTO struct {
-	ID primitive.ObjectID `validate:"isdefault" json:"id,omitempty" bson:"_id,omitempty"`
+	ID *primitive.ObjectID `validate:"isdefault" json:"id,omitempty" bson:"_id,omitempty"`
 	Status string `validate:"isdefault" json:"status,omitempty" bson:"status,omitempty"`
 	FName string `json:"fname,omitempty" bson:"fname,omitempty"`
 	LName string `json:"lname,omitempty" bson:"lname,omitempty"`

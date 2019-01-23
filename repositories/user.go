@@ -53,9 +53,9 @@ func (r *UserRepository) GetCollection() *mongo.Collection{
 	return db.GetClient().Database(r.database).Collection(r.collectionName)
 }
 
-func (r *UserRepository) Execute(arg []interface{}, param string, q QueryHandler) (result interface{}, errs []models.HumanReadableStatus) {
+func (r *UserRepository) Execute(arg []interface{}, param string, projection map[string]int, q QueryHandler) (result interface{}, errs []models.HumanReadableStatus) {
 	c := r.GetCollection()
-	result, err := q(arg, c)
+	result, err := q(arg, projection, c)
 	if err != nil {
 		r.logger.Error("failed to execute query", zap.Error(err))
 		return result, models.GetErrorFromMongo(err, param)
@@ -63,9 +63,14 @@ func (r *UserRepository) Execute(arg []interface{}, param string, q QueryHandler
 	return
 }
 
-func (r *UserRepository) Authenticate(arg[]interface{}, c *mongo.Collection) (result interface{}, err error){
+func (r *UserRepository) Authenticate(arg[]interface{}, projection map[string]int, c *mongo.Collection) (result interface{}, err error){
 	var user models.User
-	err = c.FindOne(context.Background(), bson.M{"email": arg[0].(string)}).Decode(&user)
+	opts := options.FindOneOptions{}
+	projection_override := map[string]int {
+		"password": 1,
+	}
+	opts.Projection = projection_override
+	err = c.FindOne(context.Background(), bson.M{"email": arg[0].(string)}, &opts).Decode(&user)
 	if err != nil {
 		r.logger.Error("failed to decode data", zap.Error(err))
 		return false, err
@@ -77,7 +82,7 @@ func (r *UserRepository) Authenticate(arg[]interface{}, c *mongo.Collection) (re
 	return ok, errors.New("incorrect password provided")
 }
 
-func (r *UserRepository) Create(arg []interface{}, c *mongo.Collection) (result interface{}, err error) {
+func (r *UserRepository) Create(arg []interface{}, projection map[string]int, c *mongo.Collection) (result interface{}, err error) {
 	user := arg[0].(models.User)
 	user.New()
 	res, err := c.InsertOne(context.Background(), user)
@@ -110,14 +115,16 @@ func (r *UserRepository) GetAll(arg []interface{}, c *mongo.Collection) (result 
 	return users, nil
 }
 
-func (r *UserRepository) Get(arg []interface{}, c *mongo.Collection) (result interface{}, err error){
+func (r *UserRepository) Get(arg []interface{}, projection map[string]int, c *mongo.Collection) (result interface{}, err error){
 	var user models.UserDTO
 	var object_id primitive.ObjectID
 	if object_id, err = primitive.ObjectIDFromHex(arg[0].(string)); err != nil {
 		r.logger.Error("cannot convert to object id", zap.Error(err))
 		return
 	}
-	if err = c.FindOne(context.Background(), bson.D{{"_id",object_id}}).Decode(&user); err != nil {
+	opts := options.FindOneOptions{}
+	opts.Projection = projection
+	if err = c.FindOne(context.Background(), bson.D{{"_id",object_id}}, &opts).Decode(&user); err != nil {
 		r.logger.Error("failed to decode data", zap.Error(err))
 		return
 	}
@@ -125,7 +132,7 @@ func (r *UserRepository) Get(arg []interface{}, c *mongo.Collection) (result int
 	return
 }
 
-func (r *UserRepository) Update(arg []interface{}, c *mongo.Collection) (result interface{}, err error){
+func (r *UserRepository) Update(arg []interface{}, projection map[string]int, c *mongo.Collection) (result interface{}, err error){
 	var user models.UserDTO
 	object_id, err := primitive.ObjectIDFromHex(arg[0].(string))
 	if err != nil {
@@ -134,6 +141,7 @@ func (r *UserRepository) Update(arg []interface{}, c *mongo.Collection) (result 
 	}
 	opts := options.FindOneAndUpdateOptions{}
 	opts.SetReturnDocument(options.After)
+	opts.Projection = projection
 	err = c.FindOneAndUpdate(context.Background(), bson.D{{"_id", object_id}}, bson.D{{"$set", arg[1].(models.UserDTO)}}, &opts).Decode(&user)
 	if err != nil {
 		r.logger.Error("failed to decode data", zap.Error(err))
@@ -143,7 +151,7 @@ func (r *UserRepository) Update(arg []interface{}, c *mongo.Collection) (result 
 	return
 }
 
-func (r *UserRepository) Delete(arg []interface{}, c *mongo.Collection) (result interface{}, err error){
+func (r *UserRepository) Delete(arg []interface{}, projection map[string]int, c *mongo.Collection) (result interface{}, err error){
 	var user models.UserDTO
 	object_id, err := primitive.ObjectIDFromHex(arg[0].(string))
 	if err != nil {
@@ -152,7 +160,16 @@ func (r *UserRepository) Delete(arg []interface{}, c *mongo.Collection) (result 
 	}
 	opts := options.FindOneAndUpdateOptions{}
 	opts.SetReturnDocument(options.After)
-	err = c.FindOneAndUpdate(context.Background(), bson.D{{"_id", object_id}}, bson.D{{"$set", bson.M{"status": "purge"}}}).Decode(&user)
+	projection_override := map[string]int{
+		"_id":      0,
+		"status":   0,
+		"fname":    0,
+		"lname":    0,
+		"email":    0,
+		"password": 0,
+	}
+	opts.Projection = projection_override
+	err = c.FindOneAndUpdate(context.Background(), bson.D{{"_id", object_id}}, bson.D{{"$set", bson.M{"status": "purge"}}}, &opts).Decode(&user)
 	if err != nil {
 		r.logger.Error("failed to decode data", zap.Error(err))
 		return

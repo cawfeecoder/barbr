@@ -8,6 +8,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"go.uber.org/zap"
 	"gopkg.in/go-playground/validator.v9"
+	"strings"
 )
 
 var user_repo repositories.UserRepository
@@ -26,6 +27,11 @@ func InitalizeUserRoutes(router *fasthttprouter.Router, user_repository reposito
 }
 
 func CreateUser(ctx *fasthttp.RequestCtx) {
+	projection := make(map[string]int)
+	if ctx.QueryArgs().Has("fields") {
+		params := strings.Split(string(ctx.QueryArgs().Peek("fields")), ",")
+		projection = repositories.GenerateProjectionFromFields(params)
+	}
 	var user models.User
 	resp := models.Response{}
 	err := controllers.HandleUnmarshal(ctx, &user)
@@ -37,7 +43,7 @@ func CreateUser(ctx *fasthttp.RequestCtx) {
 		controllers.HandleErrors(ctx, resp, validation_errs)
 		return
 	}
-	res, query_err := user_repo.Execute([]interface{}{user}, "", user_repo.Create)
+	res, query_err := user_repo.Execute([]interface{}{user}, "", projection, user_repo.Create)
 	if len(query_err) > 0 {
 		controllers.HandleErrors(ctx, resp, query_err)
 		return
@@ -50,8 +56,13 @@ func CreateUser(ctx *fasthttp.RequestCtx) {
 }
 
 func GetUser(ctx *fasthttp.RequestCtx) {
+	projection := make(map[string]int)
+	if ctx.QueryArgs().Has("fields") {
+		params := strings.Split(string(ctx.QueryArgs().Peek("fields")), ",")
+		projection = repositories.GenerateProjectionFromFields(params)
+	}
 	resp := models.Response{}
-	res, query_err := user_repo.Execute([]interface{}{ctx.UserValue("id")}, ctx.UserValue("id").(string), user_repo.Get)
+	res, query_err := user_repo.Execute([]interface{}{ctx.UserValue("id")}, ctx.UserValue("id").(string), projection, user_repo.Get)
 	if len(query_err) > 0 {
 		controllers.HandleErrors(ctx, resp, query_err)
 		return
@@ -64,6 +75,11 @@ func GetUser(ctx *fasthttp.RequestCtx) {
 }
 
 func UpdateUser(ctx *fasthttp.RequestCtx) {
+	projection := make(map[string]int)
+	if ctx.QueryArgs().Has("fields") {
+		params := strings.Split(string(ctx.QueryArgs().Peek("fields")), ",")
+		projection = repositories.GenerateProjectionFromFields(params)
+	}
 	var user models.UserDTO
 	resp := models.Response{}
 	err := controllers.HandleUnmarshal(ctx, &user)
@@ -75,7 +91,7 @@ func UpdateUser(ctx *fasthttp.RequestCtx) {
 		controllers.HandleErrors(ctx, resp, validation_errs)
 		return
 	}
-	res, query_err := user_repo.Execute([]interface{}{ctx.UserValue("id"), user}, ctx.UserValue("id").(string), user_repo.Update)
+	res, query_err := user_repo.Execute([]interface{}{ctx.UserValue("id"), user}, ctx.UserValue("id").(string), projection, user_repo.Update)
 	if len(query_err) > 0 {
 		controllers.HandleErrors(ctx, resp, query_err)
 		return
@@ -88,8 +104,9 @@ func UpdateUser(ctx *fasthttp.RequestCtx) {
 }
 
 func DeleteUser(ctx *fasthttp.RequestCtx) {
+	projection := make(map[string]int)
 	resp := models.Response{}
-	_, query_err := user_repo.Execute([]interface{}{ctx.UserValue("id").(string)}, "id", user_repo.Delete)
+	_, query_err := user_repo.Execute([]interface{}{ctx.UserValue("id").(string)}, "id", projection, user_repo.Delete)
 	if len(query_err) > 0 {
 		controllers.HandleErrors(ctx, resp, query_err)
 		return
