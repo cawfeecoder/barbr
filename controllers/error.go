@@ -5,12 +5,17 @@ import (
 	"ghostbox/user-service/models"
 	"github.com/valyala/fasthttp"
 	"go.uber.org/zap"
+	"log"
 )
 
 var logger *zap.Logger
 
 func init() {
-	logger, _ = zap.NewProduction()
+	var err error
+	logger, err = zap.NewProduction()
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+	}
 }
 
 func InternalServerError(ctx *fasthttp.RequestCtx){
@@ -41,8 +46,7 @@ func HandleMarshal(ctx *fasthttp.RequestCtx, source interface{}) (target []byte)
 	return target
 }
 
-func HandleErrors(ctx *fasthttp.RequestCtx, errors []models.HumanReadableStatus){
-	resp := models.Response{}
+func HandleErrors(ctx *fasthttp.RequestCtx, resp models.Response, errors []models.HumanReadableStatus){
 	resp.Errors = append(resp.Errors, errors)
 	json, err := resp.ToJSON()
 	if err != nil {

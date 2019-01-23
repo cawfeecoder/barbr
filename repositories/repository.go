@@ -3,7 +3,8 @@ package repositories
 import "github.com/mongodb/mongo-go-driver/mongo"
 
 type Repository interface {
-	GetCollection() (*mongo.Collection)
+	GetCollection() *mongo.Collection
+	Execute(arg []interface{}, param string, q QueryHandler) (interface{}, error)
 	Create(data interface{}) (interface{}, error)
 	Get(id string) (interface{}, error)
 	Update(id string, data interface{}) (interface{}, error)

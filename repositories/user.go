@@ -12,6 +12,7 @@ import (
 	"github.com/mongodb/mongo-go-driver/mongo/options"
 	"go.uber.org/zap"
 	"gopkg.in/go-playground/validator.v9"
+	"os"
 	"time"
 )
 
@@ -40,28 +41,16 @@ func (r *UserRepository) EnsureIndex() {
 		Unique: &unique,
 	}
 	opts := options.CreateIndexes().SetMaxTime(10 * time.Second)
-	r.GetCollection().Indexes().CreateOne(context.Background(), index, opts)
-	r.logger.Info("Successfully created index", zap.String("index", "email-uniq"))
+	_, err := r.GetCollection().Indexes().CreateOne(context.Background(), index, opts)
+	if err != nil {
+		r.logger.Info("failed to create index", zap.Error(err))
+		os.Exit(1)
+	}
+	r.logger.Info("successfully created index", zap.String("index", "email-uniq"))
 }
 
 func (r *UserRepository) GetCollection() *mongo.Collection{
 	return db.GetClient().Database(r.database).Collection(r.collectionName)
-}
-
-func (r *UserRepository) Authenticate(email string, password []byte) (result bool, err error) {
-	c := r.GetCollection()
-	var user models.User
-	err = c.FindOne(context.Background(), bson.M{"email": email}).Decode(&user)
-	if err != nil {
-		r.logger.Error("failed to decode data", zap.Error(err))
-		return false, err
-	}
-	ok, err := argon2.VerifyEncoded(password, []byte(user.Password))
-	if ok {
-		return true, nil
-	} else {
-		return false, errors.New("Incorrect Password")
-	}
 }
 
 func (r *UserRepository) Execute(arg []interface{}, param string, q QueryHandler) (result interface{}, errs []models.HumanReadableStatus) {
@@ -69,9 +58,20 @@ func (r *UserRepository) Execute(arg []interface{}, param string, q QueryHandler
 	result, err := q(arg, c)
 	if err != nil {
 		r.logger.Error("failed to execute query", zap.Error(err))
-		return nil, models.GetErrorFromMongo(err, param)
+		return result, models.GetErrorFromMongo(err, param)
 	}
 	return
+}
+
+func (r *UserRepository) Authenticate(arg[]interface{}, c *mongo.Collection) (result interface{}, err error){
+	var user models.User
+	err = c.FindOne(context.Background(), bson.M{"email": arg[0].(string)}).Decode(&user)
+	if err != nil {
+		r.logger.Error("failed to decode data", zap.Error(err))
+		return false, err
+	}
+	ok, err := argon2.VerifyEncoded(arg[1].([]byte), []byte(user.Password))
+	return ok, err
 }
 
 func (r *UserRepository) Create(arg []interface{}, c *mongo.Collection) (result interface{}, err error) {
@@ -84,6 +84,27 @@ func (r *UserRepository) Create(arg []interface{}, c *mongo.Collection) (result 
 	}
 	result = user.ConvertToDTO(res.InsertedID)
 	return
+}
+
+func (r *UserRepository) GetAll(arg []interface{}, c *mongo.Collection) (result interface{}, err error){
+	var users []models.UserDTO
+	cur, err := c.Find(context.Background(), bson.M{})
+	if err != nil {
+		r.logger.Error("failed to fetch data", zap.Error(err))
+		return
+	}
+	defer cur.Close(context.Background())
+	for cur.Next(context.Background()){
+		var user models.UserDTO
+		if err = cur.Decode(&user); err != nil {
+			r.logger.Error("failed to decode data", zap.Error(err))
+		}
+		users = append(users, user)
+	}
+	if err != nil {
+		return users, errors.New("Data may be missing due to an internal server error")
+	}
+	return users, nil
 }
 
 func (r *UserRepository) Get(arg []interface{}, c *mongo.Collection) (result interface{}, err error){

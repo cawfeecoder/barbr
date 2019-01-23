@@ -15,7 +15,6 @@ var duplicate_regex = regexp.MustCompile(`\D\d+\s+duplicate`)
 var extract_dup_values = regexp.MustCompile(`collection: \D+[.](?P<Collection>\D+) index: (?P<Field>\D+)_.+key:.+"(?P<Value>\D+)"`)
 
 func GetErrorFromMongo(err error, param string) []HumanReadableStatus {
-	fmt.Printf("%v", duplicate_regex.MatchString(err.Error()[1:len(err.Error())]))
 	switch {
 	case err.Error() == "mongo: no documents in result":
 		return []HumanReadableStatus{HumanReadableStatus{Type: "id-not-found", Message: "ID does not reference any documents", Param: "id", Value: param, Source: param}}
@@ -23,17 +22,14 @@ func GetErrorFromMongo(err error, param string) []HumanReadableStatus {
 		return []HumanReadableStatus{HumanReadableStatus{Type: "id-is-invalid", Message: "Provided ID is invalid because it is not a valid ObjectID", Param: "id", Value: param}}
 	case duplicate_regex.MatchString(err.Error()[1:len(err.Error())]):
 		split := strings.Split(err.Error()[1:len(err.Error())], ",")
-		fmt.Print(split)
 		for _, val := range split {
-			fmt.Printf("VAL: %s", val)
 			var dup_errors []HumanReadableStatus
 			match := extract_dup_values.FindStringSubmatch(val)
 			dup_errors = append(dup_errors, HumanReadableStatus{Type: fmt.Sprintf("dup-value-%s", match[2]), Message: fmt.Sprintf("Duplicate %s found when creating user", match[2]), Param: match[2], Value: match[3]})
-			fmt.Printf("%v", dup_errors)
 			return dup_errors
 		}
 	default:
-		return nil
+		return []HumanReadableStatus{HumanReadableStatus{Type: "unknown-error", Message: err.Error()}}
 	}
 	return nil
 }

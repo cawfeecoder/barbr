@@ -47,8 +47,7 @@ func (u *User) ConvertToDTO(id interface{}) *UserDTO{
 	}
 }
 
-func (u *User) Validate(param string) (err []HumanReadableStatus) {
-	validate := validator.New()
+func (u *User) Validate(validate *validator.Validate,param string) (err []HumanReadableStatus) {
 	var human_readable_err ValidationErrors
 	validation_err := validate.Struct(u)
 	if validation_err != nil {
@@ -66,8 +65,7 @@ type UserDTO struct {
 	Email string `validate:"email" json:"email,omitempty" bson:"email,omitempty"`
 }
 
-func (u *UserDTO) Validate(param string) (err []HumanReadableStatus) {
-	validate := validator.New()
+func (u *UserDTO) Validate(validate *validator.Validate, param string) (err []HumanReadableStatus) {
 	var human_readable_err ValidationErrors
 	validation_err := validate.Struct(u)
 	if validation_err != nil {
