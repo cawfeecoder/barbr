@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"fmt"
 	"ghostbox/user-service/db"
 	"ghostbox/user-service/models"
 	"github.com/matthewhartstonge/argon2"
@@ -70,7 +71,7 @@ func (r *UserRepository) Authenticate(arg[]interface{}, projection map[string]in
 		"password": 1,
 	}
 	opts.Projection = projection_override
-	err = c.FindOne(context.Background(), bson.M{"email": arg[0].(string)}, &opts).Decode(&user)
+	err = c.FindOne(context.Background(), bson.M{"email": arg[0].(string), "status": "active"}, &opts).Decode(&user)
 	if err != nil {
 		r.logger.Error("failed to decode data", zap.Error(err))
 		return false, err
@@ -94,9 +95,11 @@ func (r *UserRepository) Create(arg []interface{}, projection map[string]int, c 
 	return
 }
 
-func (r *UserRepository) GetAll(arg []interface{}, c *mongo.Collection) (result interface{}, err error){
+func (r *UserRepository) GetAll(arg []interface{}, projection map[string]int, c *mongo.Collection) (result interface{}, err error){
 	var users []models.UserDTO
-	cur, err := c.Find(context.Background(), bson.M{})
+	query := arg[0].(models.Query)
+	cur, err := c.Find(context.Background(), query.Cond)
+	fmt.Printf("Query: %v", query.Cond)
 	if err != nil {
 		r.logger.Error("failed to fetch data", zap.Error(err))
 		return
@@ -124,7 +127,7 @@ func (r *UserRepository) Get(arg []interface{}, projection map[string]int, c *mo
 	}
 	opts := options.FindOneOptions{}
 	opts.Projection = projection
-	if err = c.FindOne(context.Background(), bson.D{{"_id",object_id}}, &opts).Decode(&user); err != nil {
+	if err = c.FindOne(context.Background(), bson.M{"_id": object_id, "status": "active"}, &opts).Decode(&user); err != nil {
 		r.logger.Error("failed to decode data", zap.Error(err))
 		return
 	}
@@ -142,7 +145,7 @@ func (r *UserRepository) Update(arg []interface{}, projection map[string]int, c 
 	opts := options.FindOneAndUpdateOptions{}
 	opts.SetReturnDocument(options.After)
 	opts.Projection = projection
-	err = c.FindOneAndUpdate(context.Background(), bson.D{{"_id", object_id}}, bson.D{{"$set", arg[1].(models.UserDTO)}}, &opts).Decode(&user)
+	err = c.FindOneAndUpdate(context.Background(), bson.M{"_id": object_id, "status": "active"}, bson.D{{"$set", arg[1].(models.UserDTO)}}, &opts).Decode(&user)
 	if err != nil {
 		r.logger.Error("failed to decode data", zap.Error(err))
 		return
@@ -169,7 +172,7 @@ func (r *UserRepository) Delete(arg []interface{}, projection map[string]int, c 
 		"password": 0,
 	}
 	opts.Projection = projection_override
-	err = c.FindOneAndUpdate(context.Background(), bson.D{{"_id", object_id}}, bson.D{{"$set", bson.M{"status": "purge"}}}, &opts).Decode(&user)
+	err = c.FindOneAndUpdate(context.Background(), bson.M{"_id": object_id, "status": "active"}, bson.D{{"$set", bson.M{"status": "purge"}}}, &opts).Decode(&user)
 	if err != nil {
 		r.logger.Error("failed to decode data", zap.Error(err))
 		return

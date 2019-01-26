@@ -18,7 +18,7 @@ func Unauthorized(ctx *fasthttp.RequestCtx, payload []byte){
 }
 
 func HandleUnmarshal(ctx *fasthttp.RequestCtx, target interface{}) (err error){
-	err = json.Unmarshal(ctx.Request.Body(), &target)
+	err = json.Unmarshal(ctx.PostBody(), &target)
 	if err != nil {
 		logger.Error("failed to unmarshal body", zap.Error(err))
 		InternalServerError(ctx)

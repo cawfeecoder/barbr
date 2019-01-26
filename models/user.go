@@ -47,7 +47,7 @@ func (u *User) ConvertToDTO(id interface{}) *UserDTO{
 	}
 }
 
-func (u *User) Validate(validate *validator.Validate,param string) (err []HumanReadableStatus) {
+func (u *User) Validate(validate *validator.Validate, param string) (err []HumanReadableStatus) {
 	var human_readable_err ValidationErrors
 	validation_err := validate.Struct(u)
 	if validation_err != nil {

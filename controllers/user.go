@@ -4,8 +4,11 @@ import (
 	"ghostbox/user-service/models"
 	"ghostbox/user-service/repositories"
 	"github.com/valyala/fasthttp"
+	"regexp"
 	"strings"
 )
+
+var id_regex = regexp.MustCompile(`"id":`)
 
 func CreateUser(ctx *fasthttp.RequestCtx) {
 	projection := make(map[string]int)
@@ -33,7 +36,48 @@ func CreateUser(ctx *fasthttp.RequestCtx) {
 	if data := HandleMarshal(ctx, resp); data != nil {
 		ctx.Success("Success", data)
 	}
+	return
 }
+
+ func GetBatchUsers(ctx *fasthttp.RequestCtx){
+	 projection := make(map[string]int)
+	 if ctx.QueryArgs().Has("fields") {
+		 params := strings.Split(string(ctx.QueryArgs().Peek("fields")), ",")
+		 projection = repositories.GenerateProjectionFromFields(params)
+	 }
+	 var query models.Query
+	 resp := models.Response{}
+	 if len(ctx.Request.Body()) > 0 {
+	 	ctx.Request.SetBody(id_regex.ReplaceAll(ctx.Request.Body(), []byte("\"_id\":")))
+	 	err := HandleUnmarshal(ctx, &query)
+	 	if err != nil {
+	 		return
+		}
+	 	errors := query.ConvertIDs()
+	 	if len(errors) > 0 {
+	 		HandleErrors(ctx, resp, errors)
+	 		return
+		}
+	 	validation_errs := query.Validate(validate,"")
+	 	if len(validation_errs) > 0 {
+			HandleErrors(ctx, resp, validation_errs)
+			return
+		}
+	 }
+	 if len(projection) == 0 {
+	 	projection = repositories.GenerateProjectionFromFields(query.Fields)
+	 }
+	 res, query_err := user_repo.Execute([]interface{}{query}, "", projection, user_repo.GetAll)
+	 if len(query_err) > 0 {
+		 HandleErrors(ctx, resp, query_err)
+		 return
+	 }
+	 resp.Data = []interface{}{res}
+	 if data := HandleMarshal(ctx, resp); data != nil {
+		 ctx.Success("Success", data)
+	 }
+	 return
+ }
 
 func GetUser(ctx *fasthttp.RequestCtx) {
 	projection := make(map[string]int)
@@ -86,7 +130,7 @@ func UpdateUser(ctx *fasthttp.RequestCtx) {
 func DeleteUser(ctx *fasthttp.RequestCtx) {
 	projection := make(map[string]int)
 	resp := models.Response{}
-	_, query_err := user_repo.Execute([]interface{}{ctx.UserValue("id").(string)}, "id", projection, user_repo.Delete)
+	_, query_err := user_repo.Execute([]interface{}{ctx.UserValue("id").(string)}, ctx.UserValue("id").(string), projection, user_repo.Delete)
 	if len(query_err) > 0 {
 		HandleErrors(ctx, resp, query_err)
 		return
